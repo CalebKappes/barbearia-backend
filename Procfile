@@ -1,0 +1,1 @@
+web: gunicorn barbearia_project.wsgi --log-file -
