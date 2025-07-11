@@ -152,15 +152,28 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ]
 }
-# No final de settings.py
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", # Para desenvolvimento local
-]
-FRONTEND_PROD_URL = os.getenv('CORS_FRONTEND_PROD_URL')
-if FRONTEND_PROD_URL:
-    CORS_ALLOWED_ORIGINS.append(FRONTEND_PROD_URL)
-# ADICIONE ESTA LINHA:
+# barbearia_project/settings.py
+
+# --- Configuração Final de CORS ---
+
+# Pega a lista de URLs permitidas da variável de ambiente.
+# O valor na Render deve ser: https://barbearia-frontend-snowy.vercel.app,http://localhost:3000
+# O .split(',') transforma a string em uma lista Python.
+CORS_ALLOWED_ORIGINS_STR = os.getenv('CORS_ALLOWED_ORIGINS', '')
+CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_STR.split(',') if CORS_ALLOWED_ORIGINS_STR else []
+
+# Permite que o navegador envie cookies/credenciais (importante para o futuro).
 CORS_ALLOW_CREDENTIALS = True
+
+# Permite cabeçalhos específicos necessários para a nossa API.
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
 # ...
 
 # Static files (CSS, JavaScript, Images)
