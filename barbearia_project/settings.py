@@ -76,6 +76,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'barbearia_project.wsgi.application'
 
 
+# barbearia_project/settings.py
+
+# Substitua toda a sua configuração de DATABASES por esta:
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -83,16 +86,17 @@ DATABASES = {
     }
 }
 
-# Configuração para o banco de dados de produção (Render)
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.config(
-        conn_max_age=600,
-        conn_health_checks=True,
-        ssl_require=True,
-    )
-
-
+    # Se a URL for de um banco de dados PostgreSQL (como na Render)
+    if DATABASE_URL.startswith('postgres://'):
+        DATABASES['default'] = dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    else: # Para outros bancos de dados como o sqlite do nosso arquivo .env
+        DATABASES['default'] = dj_database_url.config()
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
