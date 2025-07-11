@@ -2,16 +2,25 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ServicoViewSet, ProfissionalViewSet, ClienteViewSet, AgendamentoViewSet
+# Adicione a UserRegistrationView à importação
+from .views import (
+    ServicoViewSet,
+    ProfissionalViewSet,
+    ClienteViewSet,
+    AgendamentoViewSet,
+    UserRegistrationView
+)
 
-# Cria um roteador para registrar nossos ViewSets
+# O router continua o mesmo
 router = DefaultRouter()
-router.register(r'servicos', ServicoViewSet)
-router.register(r'profissionais', ProfissionalViewSet)
-router.register(r'clientes', ClienteViewSet)
-router.register(r'agendamentos', AgendamentoViewSet)
+router.register(r'servicos', ServicoViewSet, basename='servico')
+router.register(r'profissionais', ProfissionalViewSet, basename='profissional')
+router.register(r'clientes', ClienteViewSet, basename='cliente')
+router.register(r'agendamentos', AgendamentoViewSet, basename='agendamento')
 
-# As URLs da API são agora determinadas automaticamente pelo roteador
+# Adicionamos a nova URL à lista urlpatterns
 urlpatterns = [
     path('', include(router.urls)),
+    # Esta é a nova linha para o nosso endpoint de cadastro
+    path('register/', UserRegistrationView.as_view(), name='user-register'),
 ]

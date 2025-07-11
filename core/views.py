@@ -1,35 +1,39 @@
 # core/views.py
+
+# --- BLOCO DE IMPORTS ATUALIZADO ---
 from django.utils import timezone
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, generics  # Adicionamos 'generics'
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
-# Adicione estas importações para trabalhar com datas e horas
 from datetime import datetime, time, timedelta
+from django.contrib.auth.models import User  # Adicionamos a importação do User
 
 from .models import Servico, Profissional, Cliente, Agendamento
-from .serializers import ServicoSerializer, ProfissionalSerializer, ClienteSerializer, AgendamentoSerializer
+# Adicionamos a importação do novo serializer
+from .serializers import (
+    ServicoSerializer,
+    ProfissionalSerializer,
+    ClienteSerializer,
+    AgendamentoSerializer,
+    UserRegistrationSerializer
+)
 
 
-
+# --- SUAS VIEWS ATUAIS (CONTINUAM IGUAIS) ---
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    # Adicione esta linha para criar a exceção à regra global
     permission_classes = [IsAuthenticatedOrReadOnly]
 
 
-# ### CLASSE MODIFICADA ABAIXO ###
 class ProfissionalViewSet(viewsets.ModelViewSet):
     queryset = Profissional.objects.all()
     serializer_class = ProfissionalSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
-    # Dentro da classe ProfissionalViewSet...
-    # ...
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
-        # ... (a parte de validação de parâmetros continua igual) ...
         data_str = request.query_params.get('data')
         servico_id = request.query_params.get('servico_id')
         if not data_str or not servico_id:
@@ -42,7 +46,6 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         profissional = self.get_object()
         duracao_servico = servico.duracao
 
-        # --- Lógica de Cálculo de Horários (com a correção) ---
         horarios_disponiveis = []
         horario_inicio_trabalho = time(9, 0)
         horario_fim_trabalho = time(18, 0)
@@ -55,16 +58,14 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
             data_hora_inicio__date=data
         ).order_by('data_hora_inicio')
 
-        # ### A CORREÇÃO ESTÁ AQUI ###
-        # Tornamos nosso 'slot_atual' consciente do fuso horário
         slot_atual = timezone.make_aware(datetime.combine(data, horario_inicio_trabalho))
-
         horario_fim_dia = datetime.combine(data, horario_fim_trabalho)
 
-        while slot_atual.time() < horario_fim_trabalho:  # A comparação agora é só com a hora
+        while slot_atual.time() < horario_fim_trabalho:
             slot_fim = slot_atual + duracao_servico
+            if slot_fim.time() > horario_fim_trabalho:
+                break
 
-            # ... (o resto da lógica de verificação de conflito continua igual) ...
             slot_nao_conflita_almoco = not (
                 (slot_atual.time() < horario_fim_almoco and slot_fim.time() > horario_inicio_almoco)
             )
@@ -80,9 +81,12 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
             slot_atual += intervalo_minimo
 
         return Response(horarios_disponiveis)
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
+    permission_classes = [IsAuthenticated]  # Alterado para proteger dados de clientes
 
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
@@ -96,7 +100,6 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             return self.queryset.filter(cliente__usuario=usuario_logado)
         return self.queryset.none()
 
-    # O decorador aqui é a chave para a solução
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -109,6 +112,12 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
                 {"detail": "Este usuário não possui um perfil de cliente associado."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+# --- NOVA VIEW PARA ADICIONAR AO FINAL DO ARQUIVO ---
+class UserRegistrationView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)  # Permite que qualquer um se cadastre
+    serializer_class = UserRegistrationSerializer
