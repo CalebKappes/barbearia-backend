@@ -150,8 +150,11 @@ REST_FRAMEWORK = {
 }
 # No final de settings.py
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", # O endereço do nosso frontend React
+    "http://localhost:3000", # Para desenvolvimento local
 ]
+FRONTEND_PROD_URL = os.getenv('CORS_FRONTEND_PROD_URL')
+if FRONTEND_PROD_URL:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_PROD_URL)
 # ADICIONE ESTA LINHA:
 CORS_ALLOW_CREDENTIALS = True
 # ...
