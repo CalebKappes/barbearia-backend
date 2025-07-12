@@ -3,17 +3,17 @@
 from django.contrib import admin
 from django.urls import path, include
 
-# Importações para o nosso login com token customizado
 from core.views import MyTokenObtainPairView
-# Importação para o refresh do token
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
-    # Rotas que já tínhamos
     path('admin/', admin.site.urls),
-    path('api/', include('core.urls')),  # Aponta para o outro arquivo urls.py
+    path('api/', include('core.urls')),
 
-    # Rotas de Autenticação
+    # Rotas de Autenticação por Token para o nosso App React
     path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    # Rota de autenticação por sessão para a API Navegável (para testes)
+    path('api-auth/', include('rest_framework.urls')),
 ]
