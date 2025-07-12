@@ -2,15 +2,16 @@
 
 # --- BLOCO DE IMPORTS ATUALIZADO ---
 from django.utils import timezone
-from rest_framework import viewsets, status, generics  # Adicionamos 'generics'
+from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, AllowAny
+# Remova IsAuthenticatedOrReadOnly e adicione a nossa permissão
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .permissions import IsAdminUserOrReadOnly # <-- NOVA IMPORTAÇÃO
 from datetime import datetime, time, timedelta
-from django.contrib.auth.models import User  # Adicionamos a importação do User
+from django.contrib.auth.models import User
 
 from .models import Servico, Profissional, Cliente, Agendamento
-# Adicionamos a importação do novo serializer
 from .serializers import (
     ServicoSerializer,
     ProfissionalSerializer,
@@ -20,20 +21,21 @@ from .serializers import (
 )
 
 
-# --- SUAS VIEWS ATUAIS (CONTINUAM IGUAIS) ---
+# --- VIEWS MODIFICADAS ---
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAdminUserOrReadOnly] # <-- ALTERADO AQUI
 
 
 class ProfissionalViewSet(viewsets.ModelViewSet):
     queryset = Profissional.objects.all()
     serializer_class = ProfissionalSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAdminUserOrReadOnly] # <-- ALTERADO AQUI
 
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
+        # ... (toda a sua lógica de horários continua igual aqui, sem alterações)
         data_str = request.query_params.get('data')
         servico_id = request.query_params.get('servico_id')
         if not data_str or not servico_id:
@@ -83,10 +85,11 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         return Response(horarios_disponiveis)
 
 
+# --- O RESTO DAS VIEWS CONTINUA IGUAL ---
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
-    permission_classes = [IsAuthenticated]  # Alterado para proteger dados de clientes
+    permission_classes = [IsAuthenticated]
 
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
@@ -116,8 +119,7 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-# --- NOVA VIEW PARA ADICIONAR AO FINAL DO ARQUIVO ---
 class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
-    permission_classes = (AllowAny,)  # Permite que qualquer um se cadastre
+    permission_classes = (AllowAny,)
     serializer_class = UserRegistrationSerializer
