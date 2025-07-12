@@ -1,15 +1,16 @@
 # core/views.py
 
-# --- BLOCO DE IMPORTS ATUALIZADO ---
 from django.utils import timezone
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
-# Remova IsAuthenticatedOrReadOnly e adicione a nossa permissão
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .permissions import IsAdminUserOrReadOnly # <-- NOVA IMPORTAÇÃO
+from .permissions import IsAdminUserOrReadOnly
 from datetime import datetime, time, timedelta
 from django.contrib.auth.models import User
+# Importações para a nossa view de token customizada
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import MyTokenObtainPairSerializer
 
 from .models import Servico, Profissional, Cliente, Agendamento
 from .serializers import (
@@ -21,21 +22,20 @@ from .serializers import (
 )
 
 
-# --- VIEWS MODIFICADAS ---
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    permission_classes = [IsAdminUserOrReadOnly] # <-- ALTERADO AQUI
+    permission_classes = [IsAdminUserOrReadOnly]
 
 
 class ProfissionalViewSet(viewsets.ModelViewSet):
     queryset = Profissional.objects.all()
     serializer_class = ProfissionalSerializer
-    permission_classes = [IsAdminUserOrReadOnly] # <-- ALTERADO AQUI
+    permission_classes = [IsAdminUserOrReadOnly]
 
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
-        # ... (toda a sua lógica de horários continua igual aqui, sem alterações)
+        # ... (toda a sua lógica de horários continua aqui, sem alterações)
         data_str = request.query_params.get('data')
         servico_id = request.query_params.get('servico_id')
         if not data_str or not servico_id:
@@ -85,7 +85,6 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         return Response(horarios_disponiveis)
 
 
-# --- O RESTO DAS VIEWS CONTINUA IGUAL ---
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
@@ -123,3 +122,8 @@ class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = UserRegistrationSerializer
+
+
+# ### VIEW CUSTOMIZADA DE TOKEN QUE ESTAVA A FALTAR ###
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
