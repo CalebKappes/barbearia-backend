@@ -91,6 +91,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+# No seu arquivo core/views.py
+
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
     permission_classes = [IsAuthenticated]
@@ -99,7 +101,8 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         usuario_logado = self.request.user
         if usuario_logado.is_authenticated:
-            return self.queryset.filter(cliente__usuario=usuario_logado)
+            # Ordena para mostrar os agendamentos mais recentes/futuros primeiro
+            return self.queryset.filter(cliente__usuario=usuario_logado).order_by('-data_hora_inicio')
         return self.queryset.none()
 
     def create(self, request, *args, **kwargs):
@@ -116,6 +119,25 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             )
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    # ### A NOVA FUNÇÃO DE CANCELAMENTO ###
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        agendamento = self.get_object()
+
+        # Verificação de segurança: garante que o usuário só pode cancelar seus próprios agendamentos
+        if agendamento.cliente.usuario != request.user:
+            return Response({'detail': 'Você não tem permissão para cancelar este agendamento.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        # Altera o status para 'Cancelado'
+        # Usamos o código 'CAN' que já existe no seu modelo.
+        agendamento.status = 'CAN'
+        agendamento.save()
+
+        # Retorna o agendamento atualizado para o frontend
+        serializer = self.get_serializer(agendamento)
+        return Response(serializer.data)
 
 
 class UserRegistrationView(generics.CreateAPIView):
