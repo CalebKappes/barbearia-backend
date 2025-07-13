@@ -90,6 +90,9 @@ class ClienteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+# core/views.py
+# ... (todos os seus imports no topo do arquivo) ...
+
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
     permission_classes = [IsAuthenticated]
@@ -102,13 +105,12 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
         return self.queryset.none()
 
     def create(self, request, *args, **kwargs):
+        # ... (seu método create, que já envia e-mail de confirmação, continua igual)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         try:
             cliente = request.user.cliente
             agendamento = serializer.save(cliente=cliente)
-
             try:
                 data_formatada = agendamento.data_hora_inicio.strftime('%d/%m/%Y')
                 hora_formatada = agendamento.data_hora_inicio.strftime('%H:%M')
@@ -127,26 +129,52 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
                 send_mail(assunto, corpo, email_remetente, email_destinatario, fail_silently=False)
             except Exception as e:
                 print(f"ERRO ao enviar e-mail de confirmação: {e}")
-
         except AttributeError:
-            return Response(
-                {"detail": "Este usuário não possui um perfil de cliente associado."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+            return Response({"detail": "Este usuário não possui um perfil de cliente associado."},
+                            status=status.HTTP_400_BAD_REQUEST)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    # ### MÉTODO DE CANCELAMENTO ATUALIZADO ###
     @action(detail=True, methods=['post'])
     def cancelar(self, request, pk=None):
         agendamento = self.get_object()
+
         if agendamento.cliente.usuario != request.user:
             return Response({'detail': 'Você não tem permissão para cancelar este agendamento.'},
                             status=status.HTTP_403_FORBIDDEN)
+
+        # Altera o status para 'Cancelado'
         agendamento.status = 'CAN'
         agendamento.save()
+
+        # --- LÓGICA DE ENVIO DE E-MAIL DE CANCELAMENTO ---
+        try:
+            cliente = agendamento.cliente
+            data_formatada = agendamento.data_hora_inicio.strftime('%d/%m/%Y')
+            hora_formatada = agendamento.data_hora_inicio.strftime('%H:%M')
+
+            assunto = f"Cancelamento de Agendamento - {agendamento.servico.nome}"
+            corpo = (
+                f"Olá, {cliente.nome}!\n\n"
+                f"Confirmamos o cancelamento do seu agendamento para o serviço '{agendamento.servico.nome}' "
+                f"que estava marcado para o dia {data_formatada} às {hora_formatada}.\n\n"
+                "Esperamos vê-lo em breve!\n"
+                "Sherlock Barber"
+            )
+
+            email_remetente = settings.SENDGRID_FROM_EMAIL
+            email_destinatario = [cliente.email]
+            send_mail(assunto, corpo, email_remetente, email_destinatario, fail_silently=False)
+        except Exception as e:
+            print(f"ERRO ao enviar e-mail de cancelamento: {e}")
+        # --- FIM DA LÓGICA DE E-MAIL ---
+
         serializer = self.get_serializer(agendamento)
         return Response(serializer.data)
+
+
+# ... (o resto do seu views.py continua igual) ...
 
 
 class UserRegistrationView(generics.CreateAPIView):
