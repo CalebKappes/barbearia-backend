@@ -1,5 +1,6 @@
 # core/views.py
-
+from django.core.mail import send_mail
+from django.conf import settings  # <-- A LINHA QUE FALTAVA PARA CORRIGIR O ERRO
 from django.utils import timezone
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
@@ -8,7 +9,6 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsAdminUserOrReadOnly
 from datetime import datetime, time, timedelta
 from django.contrib.auth.models import User
-# Importações para a nossa view de token customizada
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
 
@@ -35,7 +35,6 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
-        # ... (toda a sua lógica de horários continua aqui, sem alterações)
         data_str = request.query_params.get('data')
         servico_id = request.query_params.get('servico_id')
         if not data_str or not servico_id:
@@ -61,7 +60,6 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         ).order_by('data_hora_inicio')
 
         slot_atual = timezone.make_aware(datetime.combine(data, horario_inicio_trabalho))
-        horario_fim_dia = datetime.combine(data, horario_fim_trabalho)
 
         while slot_atual.time() < horario_fim_trabalho:
             slot_fim = slot_atual + duracao_servico
@@ -91,8 +89,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
-# No seu arquivo core/views.py
-
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
     permission_classes = [IsAuthenticated]
@@ -101,7 +97,6 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         usuario_logado = self.request.user
         if usuario_logado.is_authenticated:
-            # Ordena para mostrar os agendamentos mais recentes/futuros primeiro
             return self.queryset.filter(cliente__usuario=usuario_logado).order_by('-data_hora_inicio')
         return self.queryset.none()
 
@@ -111,31 +106,44 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
 
         try:
             cliente = request.user.cliente
-            serializer.save(cliente=cliente)
+            agendamento = serializer.save(cliente=cliente)
+
+            try:
+                data_formatada = agendamento.data_hora_inicio.strftime('%d/%m/%Y')
+                hora_formatada = agendamento.data_hora_inicio.strftime('%H:%M')
+                assunto = f"Confirmação de Agendamento - {agendamento.servico.nome}"
+                corpo = (
+                    f"Olá, {cliente.nome}!\n\n"
+                    f"Seu agendamento para o serviço '{agendamento.servico.nome}' com o profissional {agendamento.profissional.nome} "
+                    f"foi confirmado com sucesso.\n\n"
+                    f"Data: {data_formatada}\n"
+                    f"Horário: {hora_formatada}\n\n"
+                    "Agradecemos a preferência!\n"
+                    "Sherlock Barber"
+                )
+                email_remetente = settings.SENDGRID_FROM_EMAIL
+                email_destinatario = [cliente.email]
+                send_mail(assunto, corpo, email_remetente, email_destinatario, fail_silently=False)
+            except Exception as e:
+                print(f"ERRO ao enviar e-mail de confirmação: {e}")
+
         except AttributeError:
             return Response(
                 {"detail": "Este usuário não possui um perfil de cliente associado."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    # ### A NOVA FUNÇÃO DE CANCELAMENTO ###
     @action(detail=True, methods=['post'])
     def cancelar(self, request, pk=None):
         agendamento = self.get_object()
-
-        # Verificação de segurança: garante que o usuário só pode cancelar seus próprios agendamentos
         if agendamento.cliente.usuario != request.user:
             return Response({'detail': 'Você não tem permissão para cancelar este agendamento.'},
                             status=status.HTTP_403_FORBIDDEN)
-
-        # Altera o status para 'Cancelado'
-        # Usamos o código 'CAN' que já existe no seu modelo.
         agendamento.status = 'CAN'
         agendamento.save()
-
-        # Retorna o agendamento atualizado para o frontend
         serializer = self.get_serializer(agendamento)
         return Response(serializer.data)
 
@@ -146,6 +154,5 @@ class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
 
 
-# ### VIEW CUSTOMIZADA DE TOKEN QUE ESTAVA A FALTAR ###
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer

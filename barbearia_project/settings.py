@@ -189,3 +189,13 @@ SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_SECURE = True
+
+# settings.py
+# ... no final do arquivo ...
+
+# Configurações de E-mail com SendGrid
+EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
+# A sua chave de API será lida de uma variável de ambiente
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+# E-mail que aparecerá como remetente
+SENDGRID_FROM_EMAIL = "sherlockbarberapp@gmail.com"
