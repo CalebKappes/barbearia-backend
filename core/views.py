@@ -206,3 +206,57 @@ class TriggerRemindersView(generics.GenericAPIView):
         except Exception as e:
             # Se algo der errado, retorna um erro
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# Adicione no final de core/views.py
+
+# ... (todas as suas outras views ficam como estão) ...
+
+# ### NOVA VIEWSET PARA A AGENDA DO ADMIN ###
+class AdminAgendamentoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Esta ViewSet retorna TODOS os agendamentos.
+    O acesso é restrito apenas a usuários administradores.
+    """
+    serializer_class = AgendamentoSerializer
+    permission_classes = [IsAdminUserOrReadOnly] # Usa nossa permissão de admin
+
+    def get_queryset(self):
+        # Retorna todos os agendamentos, sem filtrar por usuário
+        return Agendamento.objects.all().order_by('-data_hora_inicio')
+
+'''
+*Nota: Usamos `ReadOnlyModelViewSet` porque, por enquanto, o admin só irá visualizar os agendamentos no calendário. As ações de criar/editar ainda são feitas pelo cliente ou pelo painel do Django.*
+
+#### Passo 2: Adicione a Nova Rota no `urls.py`
+
+Agora, precisamos criar a URL para esta nova view.
+* Abra o arquivo `core/urls.py`.
+* Vamos adicionar a nova view ao `router`.
+
+
+'''
+# core/urls.py
+
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    ServicoViewSet,
+    ProfissionalViewSet,
+    ClienteViewSet,
+    AgendamentoViewSet,
+    UserRegistrationView,
+    AdminAgendamentoViewSet # 1. Importamos a nova view
+)
+
+router = DefaultRouter()
+router.register(r'servicos', ServicoViewSet, basename='servico')
+router.register(r'profissionais', ProfissionalViewSet, basename='profissional')
+router.register(r'clientes', ClienteViewSet, basename='cliente')
+router.register(r'agendamentos', AgendamentoViewSet, basename='agendamento')
+
+# 2. Registramos a nova rota para a agenda do admin
+router.register(r'admin/agenda', AdminAgendamentoViewSet, basename='admin-agenda')
+
+urlpatterns = [
+    path('', include(router.urls)),
+    path('register/', UserRegistrationView.as_view(), name='user-register'),
+]
