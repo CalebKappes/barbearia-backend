@@ -67,6 +67,15 @@ class Agendamento(models.Model):
     data_hora_inicio = models.DateTimeField(verbose_name="Início do Atendimento")
     data_hora_fim = models.DateTimeField(verbose_name="Fim do Atendimento", editable=False) # Calculado automaticamente
     status = models.CharField(max_length=3, choices=STATUS_CHOICES, default='AGD', verbose_name="Status")
+    lembrete_enviado = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.data_hora_inicio and self.servico:
+            self.data_hora_fim = self.data_hora_inicio + self.servico.duracao
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.servico.nome} com {self.profissional.nome} para {self.cliente.nome}"
 
     def save(self, *args, **kwargs):
         # Calcula a hora de término automaticamente ao salvar
