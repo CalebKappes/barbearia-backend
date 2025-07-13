@@ -8,7 +8,7 @@ from .views import (
     ClienteViewSet,
     AgendamentoViewSet,
     UserRegistrationView,
-    TriggerRemindersView  # 1. Adicione a nova view à importação
+    AdminAgendamentoViewSet  # A view do nosso painel de agenda
 )
 
 router = DefaultRouter()
@@ -16,12 +16,17 @@ router.register(r'servicos', ServicoViewSet, basename='servico')
 router.register(r'profissionais', ProfissionalViewSet, basename='profissional')
 router.register(r'clientes', ClienteViewSet, basename='cliente')
 router.register(r'agendamentos', AgendamentoViewSet, basename='agendamento')
+# REMOVA a linha "router.register(r'admin/agenda', ...)" daqui.
 
+# Lista final de URLs
 urlpatterns = [
+    # Inclui todas as rotas do router (servicos, profissionais, etc.)
     path('', include(router.urls)),
+
+    # Rota de cadastro
     path('register/', UserRegistrationView.as_view(), name='user-register'),
 
-    # 2. ADICIONE ESTA NOVA LINHA PARA O CRON JOB:
-    # A URL inclui um parâmetro <str:cron_secret> para a nossa chave de segurança
-    path('trigger-reminders/<str:cron_secret>/', TriggerRemindersView.as_view(), name='trigger-reminders'),
+    # ADICIONE A ROTA DA AGENDA DO ADMIN AQUI:
+    # Usamos .as_view({'get': 'list'}) porque é uma ReadOnlyModelViewSet que só precisa da ação de listar.
+    path('admin/agenda/', AdminAgendamentoViewSet.as_view({'get': 'list'}), name='admin-agenda-list'),
 ]
