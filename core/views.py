@@ -11,7 +11,8 @@ from django.contrib.auth.models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
 from django.core import management
-
+from .permissions import IsAdminUserOrReadOnly
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from .models import Servico, Profissional, Cliente, Agendamento
 from .serializers import (
     ServicoSerializer,
@@ -25,13 +26,15 @@ from .serializers import (
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    permission_classes = [IsAdminUser]
+    # Usa nossa permissão customizada: Leitura para todos logados, escrita para admins
+    permission_classes = [IsAdminUserOrReadOnly]
 
 
 class ProfissionalViewSet(viewsets.ModelViewSet):
     queryset = Profissional.objects.all()
     serializer_class = ProfissionalSerializer
-    permission_classes = [IsAdminUser]
+    # Usa nossa permissão customizada: Leitura para todos logados, escrita para admins
+    permission_classes = [IsAdminUserOrReadOnly]
 
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
@@ -142,6 +145,10 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(agendamento).data)
 
 
+class AdminAgendamentoViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AgendamentoSerializer
+    permission_classes = [IsAdminUser] # Apenas admins podem ver a agenda completa
+    queryset = Agendamento.objects.all().order_by('-data_hora_inicio')
 class UserRegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
