@@ -125,28 +125,3 @@ class MyTokenObtainPairView(TokenObtainPairView):
     # ... (seu MyTokenObtainPairView continua igual)
     serializer_class = MyTokenObtainPairSerializer
 
-
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import (
-    ServicoViewSet,
-    ProfissionalViewSet,
-    ClienteViewSet,
-    AgendamentoViewSet,
-    UserRegistrationView,
-    AdminAgendamentoViewSet # 1. Importamos a nova view
-)
-
-router = DefaultRouter()
-router.register(r'servicos', ServicoViewSet, basename='servico')
-router.register(r'profissionais', ProfissionalViewSet, basename='profissional')
-router.register(r'clientes', ClienteViewSet, basename='cliente')
-router.register(r'agendamentos', AgendamentoViewSet, basename='agendamento')
-
-# 2. Registramos a nova rota para a agenda do admin
-router.register(r'admin/agenda', AdminAgendamentoViewSet, basename='admin-agenda')
-
-urlpatterns = [
-    path('', include(router.urls)),
-    path('register/', UserRegistrationView.as_view(), name='user-register'),
-]
