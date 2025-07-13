@@ -199,3 +199,5 @@ EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 # E-mail que aparecerá como remetente
 SENDGRID_FROM_EMAIL = "sherlockbarberapp@gmail.com"
+# settings.py (no final do arquivo)
+CRON_SECRET_KEY = os.getenv("CRON_SECRET_KEY")

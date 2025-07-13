@@ -1,6 +1,6 @@
 # core/views.py
 from django.core.mail import send_mail
-from django.conf import settings  # <-- A LINHA QUE FALTAVA PARA CORRIGIR O ERRO
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
@@ -11,6 +11,7 @@ from datetime import datetime, time, timedelta
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
+from django.core import management  # Importa o módulo de gestão do Django
 
 from .models import Servico, Profissional, Cliente, Agendamento
 from .serializers import (
@@ -156,3 +157,24 @@ class UserRegistrationView(generics.CreateAPIView):
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+
+
+# ### NOVA VIEW PARA O CRON JOB ###
+class TriggerRemindersView(generics.GenericAPIView):
+    permission_classes = (AllowAny,)  # A permissão é feita pela URL secreta
+
+    def get(self, request, *args, **kwargs):
+        # Pega a chave secreta da URL
+        cron_secret = kwargs.get("cron_secret")
+
+        # Compara com a chave secreta definida no nosso ambiente
+        if cron_secret != settings.CRON_SECRET_KEY:
+            return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            # Chama o nosso comando de gestão 'enviar_lembretes'
+            management.call_command('enviar_lembretes')
+            return Response({"status": "Lembretes verificados com sucesso."})
+        except Exception as e:
+            # Se algo der errado, retorna um erro
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

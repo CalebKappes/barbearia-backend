@@ -7,7 +7,8 @@ from .views import (
     ProfissionalViewSet,
     ClienteViewSet,
     AgendamentoViewSet,
-    UserRegistrationView  # A view de cadastro
+    UserRegistrationView,
+    TriggerRemindersView  # 1. Adicione a nova view à importação
 )
 
 router = DefaultRouter()
@@ -16,11 +17,11 @@ router.register(r'profissionais', ProfissionalViewSet, basename='profissional')
 router.register(r'clientes', ClienteViewSet, basename='cliente')
 router.register(r'agendamentos', AgendamentoViewSet, basename='agendamento')
 
-# A lista de URLs do nosso app 'core'
 urlpatterns = [
-    # URLs geradas automaticamente pelo router (servicos, profissionais, etc.)
     path('', include(router.urls)),
-
-    # URL para o nosso endpoint de cadastro
     path('register/', UserRegistrationView.as_view(), name='user-register'),
+
+    # 2. ADICIONE ESTA NOVA LINHA PARA O CRON JOB:
+    # A URL inclui um parâmetro <str:cron_secret> para a nossa chave de segurança
+    path('trigger-reminders/<str:cron_secret>/', TriggerRemindersView.as_view(), name='trigger-reminders'),
 ]
