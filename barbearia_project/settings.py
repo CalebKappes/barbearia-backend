@@ -3,7 +3,8 @@
 import os
 import dj_database_url
 from pathlib import Path
-
+from decouple import config
+import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -11,8 +12,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-# SECRET_KEY agora vem de uma variável de ambiente
-SECRET_KEY = os.getenv("SECRET_KEY")
+# SECRET_KEY agora vem de uma variável de ambienteF
+SECRET_KEY = config('SECRET_KEY')
 
 # DEBUG agora vem de uma variável de ambiente
 # O 'False' é o padrão se a variável não for encontrada (mais seguro)
@@ -78,25 +79,9 @@ WSGI_APPLICATION = 'barbearia_project.wsgi.application'
 
 # barbearia_project/settings.py
 
-# Substitua toda a sua configuração de DATABASES por esta:
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.parse(config('DATABASE_URL'))
 }
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    # Se a URL for de um banco de dados PostgreSQL (como na Render)
-    if DATABASE_URL.startswith('postgres://'):
-        DATABASES['default'] = dj_database_url.config(
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    else: # Para outros bancos de dados como o sqlite do nosso arquivo .env
-        DATABASES['default'] = dj_database_url.config()
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -146,21 +131,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Substitua o dicionário REST_FRAMEWORK antigo por este:
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ]
 }
-# barbearia_project/settings.py
-
 # --- Configuração Final de CORS ---
 
-# Pega a lista de URLs permitidas da variável de ambiente.
-# O valor na Render deve ser: https://barbearia-frontend-snowy.vercel.app,http://localhost:3000
-# O .split(',') transforma a string em uma lista Python.
-CORS_ALLOWED_ORIGINS_STR = os.getenv('CORS_ALLOWED_ORIGINS', '')
-CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_STR.split(',') if CORS_ALLOWED_ORIGINS_STR else []
+# Para desenvolvimento local, permita o acesso do React
+if DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+# Para produção, use a variável de ambiente
+else:
+    CORS_ALLOWED_ORIGINS_STR = os.getenv('CORS_ALLOWED_ORIGINS', '')
+    CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_STR.split(',') if CORS_ALLOWED_ORIGINS_STR else []
+
 
 # Permite que o navegador envie cookies/credenciais (importante para o futuro).
 CORS_ALLOW_CREDENTIALS = True
@@ -174,8 +164,6 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
-# ...
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 

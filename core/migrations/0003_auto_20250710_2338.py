@@ -1,7 +1,7 @@
 # Este é o conteúdo do seu novo arquivo de migração (ex: 0003_auto_....py)
 
 from django.db import migrations
-
+from decouple import config
 # Esta função define a ação que queremos executar: criar um superusuário.
 def create_superuser(apps, schema_editor):
     User = apps.get_model('auth', 'User')
