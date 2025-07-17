@@ -1,4 +1,5 @@
 # core/views.py
+
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
@@ -7,34 +8,34 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from datetime import datetime, time, timedelta
-from django.contrib.auth.models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import MyTokenObtainPairSerializer
 from django.core import management
 from .permissions import IsAdminUserOrReadOnly
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
-from .models import Servico, Profissional, Cliente, Agendamento
+
+# --- IMPORTS CORRIGIDOS ---
+from .models import Servico, Barbeiro, Usuario, Agendamento
 from .serializers import (
     ServicoSerializer,
-    ProfissionalSerializer,
-    ClienteSerializer,
+    BarbeiroSerializer,
+    UsuarioSerializer,
     AgendamentoSerializer,
-    UserRegistrationSerializer
+    UserRegistrationSerializer,
+    MyTokenObtainPairSerializer
 )
 
 
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    # Usa nossa permissão customizada: Leitura para todos logados, escrita para admins
     permission_classes = [IsAdminUserOrReadOnly]
 
 
-class ProfissionalViewSet(viewsets.ModelViewSet):
-    queryset = Profissional.objects.all()
-    serializer_class = ProfissionalSerializer
-    # Usa nossa permissão customizada: Leitura para todos logados, escrita para admins
+class BarbeiroViewSet(viewsets.ModelViewSet):
+    queryset = Barbeiro.objects.all()
+    serializer_class = BarbeiroSerializer
     permission_classes = [IsAdminUserOrReadOnly]
+
+    # Este método vai dentro da classe BarbeiroViewSet
 
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
@@ -42,25 +43,32 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         servico_id = request.query_params.get('servico_id')
         if not data_str or not servico_id:
             return Response({"detail": "Os parâmetros 'data' e 'servico_id' são obrigatórios."}, status=400)
+
         try:
             data = datetime.strptime(data_str, '%Y-%m-%d').date()
             servico = Servico.objects.get(pk=servico_id)
         except (ValueError, Servico.DoesNotExist):
             return Response({"detail": "Data ou serviço inválido."}, status=400)
-        profissional = self.get_object()
-        duracao_servico = servico.duracao
 
-        horarios_disponiveis = []
-        horario_inicio_trabalho = time(9, 0)
-        horario_fim_trabalho = time(19, 0)
-        horario_inicio_almoco = time(12, 0)
-        horario_fim_almoco = time(14, 0)
+        barbeiro = self.get_object()
+        duracao_servico = timedelta(minutes=servico.duracao_em_minutos)
+
+        # --- LÓGICA REATORADA ---
+        # Buscando os horários diretamente do objeto 'barbeiro' do banco de dados!
+        # Não usamos mais valores fixos como time(9, 0).
+        horario_inicio_trabalho = barbeiro.horario_inicio_trabalho
+        horario_fim_trabalho = barbeiro.horario_fim_trabalho
+        horario_inicio_almoco = barbeiro.horario_inicio_almoco
+        horario_fim_almoco = barbeiro.horario_fim_almoco
+        # -------------------------
+
         intervalo_minimo = timedelta(minutes=15)
+        horarios_disponiveis = []
 
         agendamentos_do_dia = Agendamento.objects.filter(
-            profissional=profissional,
-            data_hora_inicio__date=data
-        ).order_by('data_hora_inicio')
+            barbeiro=barbeiro,
+            data_agendamento__date=data
+        ).order_by('data_agendamento')
 
         slot_atual = timezone.make_aware(datetime.combine(data, horario_inicio_trabalho))
 
@@ -74,7 +82,9 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
             )
             slot_livre = True
             for agendamento in agendamentos_do_dia:
-                if slot_atual < agendamento.data_hora_fim and slot_fim > agendamento.data_hora_inicio:
+                agendamento_inicio = agendamento.data_agendamento
+                agendamento_fim = agendamento_inicio + timedelta(minutes=agendamento.servico.duracao_em_minutos)
+                if slot_atual < agendamento_fim and slot_fim > agendamento_inicio:
                     slot_livre = False
                     break
 
@@ -86,71 +96,58 @@ class ProfissionalViewSet(viewsets.ModelViewSet):
         return Response(horarios_disponiveis)
 
 
-class ClienteViewSet(viewsets.ModelViewSet):
-    queryset = Cliente.objects.all()
-    serializer_class = ClienteSerializer
-    permission_classes = [IsAuthenticated]
+class UsuarioViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Usuario.objects.all()
+    serializer_class = UsuarioSerializer
+    permission_classes = [IsAdminUser]
 
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Agendamento.objects.all()
 
     def get_queryset(self):
-        usuario_logado = self.request.user
-        if usuario_logado.is_authenticated:
-            # Se for admin, retorna todos os agendamentos
-            if usuario_logado.is_staff:
-                return self.queryset.all().order_by('-data_hora_inicio')
-            # Se for cliente, retorna apenas os seus
-            return self.queryset.filter(cliente__usuario=usuario_logado).order_by('-data_hora_inicio')
-        return self.queryset.none()
+        user = self.request.user
+        if user.is_staff:
+            return Agendamento.objects.all().order_by('-data_agendamento')
+        return Agendamento.objects.filter(cliente=user).order_by('-data_agendamento')
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        agendamento = serializer.save(cliente=request.user)
+
         try:
-            cliente = request.user.cliente
-            agendamento = serializer.save(cliente=cliente)
-            try:
-                data_formatada = agendamento.data_hora_inicio.strftime('%d/%m/%Y')
-                hora_formatada = agendamento.data_hora_inicio.strftime('%H:%M')
-                assunto = f"Confirmação de Agendamento - {agendamento.servico.nome}"
-                corpo = f"Olá, {cliente.nome}!\n\nSeu agendamento para o serviço '{agendamento.servico.nome}' com {agendamento.profissional.nome} foi confirmado.\n\nData: {data_formatada}\nHorário: {hora_formatada}\n\nObrigado!"
-                send_mail(assunto, corpo, settings.SENDGRID_FROM_EMAIL, [cliente.email], fail_silently=False)
-            except Exception as e:
-                print(f"ERRO ao enviar e-mail de confirmação: {e}")
-        except AttributeError:
-            return Response({"detail": "Perfil de cliente não encontrado."}, status=status.HTTP_400_BAD_REQUEST)
+            data_formatada = agendamento.data_agendamento.strftime('%d/%m/%Y')
+            hora_formatada = agendamento.data_agendamento.strftime('%H:%M')
+            assunto = f"Confirmação de Agendamento - {agendamento.servico.nome}"
+            corpo = f"Olá, {request.user.first_name or request.user.username}!\n\nSeu agendamento para o serviço '{agendamento.servico.nome}' com {agendamento.barbeiro.nome} foi confirmado.\n\nData: {data_formatada}\nHorário: {hora_formatada}\n\nObrigado!"
+            send_mail(assunto, corpo, settings.SENDGRID_FROM_EMAIL, [request.user.email], fail_silently=False)
+        except Exception as e:
+            print(f"ERRO ao enviar e-mail de confirmação: {e}")
+
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=['post'])
     def cancelar(self, request, pk=None):
         agendamento = self.get_object()
-        if not request.user.is_staff and agendamento.cliente.usuario != request.user:
+        if not request.user.is_staff and agendamento.cliente != request.user:
             return Response({'detail': 'Não permitido.'}, status=status.HTTP_403_FORBIDDEN)
-        agendamento.status = 'CAN'
-        agendamento.save()
-        try:
-            cliente = agendamento.cliente
-            data_formatada = agendamento.data_hora_inicio.strftime('%d/%m/%Y')
-            hora_formatada = agendamento.data_hora_inicio.strftime('%H:%M')
-            assunto = f"Cancelamento de Agendamento - {agendamento.servico.nome}"
-            corpo = f"Olá, {cliente.nome}!\n\nConfirmamos o cancelamento do seu agendamento para o dia {data_formatada} às {hora_formatada}.\n\nEsperamos vê-lo em breve."
-            send_mail(assunto, corpo, settings.SENDGRID_FROM_EMAIL, [cliente.email], fail_silently=False)
-        except Exception as e:
-            print(f"ERRO ao enviar e-mail de cancelamento: {e}")
-        return Response(self.get_serializer(agendamento).data)
+
+        agendamento.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AdminAgendamentoViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AgendamentoSerializer
-    permission_classes = [IsAdminUser] # Apenas admins podem ver a agenda completa
-    queryset = Agendamento.objects.all().order_by('-data_hora_inicio')
+    permission_classes = [IsAdminUser]
+    queryset = Agendamento.objects.all().order_by('-data_agendamento')
+
+
 class UserRegistrationView(generics.CreateAPIView):
-    queryset = User.objects.all()
+    queryset = Usuario.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = UserRegistrationSerializer
 
@@ -171,4 +168,3 @@ class TriggerRemindersView(generics.GenericAPIView):
             return Response({"status": "Lembretes verificados com sucesso."})
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

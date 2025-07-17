@@ -189,3 +189,26 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_FROM_EMAIL = "sherlockbarberapp@gmail.com"
 # settings.py (no final do arquivo)
 CRON_SECRET_KEY = os.getenv("CRON_SECRET_KEY")
+# settings.py
+
+# ... todo o resto do seu arquivo ...
+
+# Designa nosso modelo customizado como o padrão para autenticação
+AUTH_USER_MODEL = 'core.Usuario'
+# settings.py
+
+# ... (outras configurações) ...
+
+# --- CONFIGURAÇÕES DE E-MAIL (SENDGRID) ---
+# Lendo as variáveis do nosso arquivo .env
+SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
+SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='')
+
+# Configuração do serviço de e-mail do Django
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.sendgrid.net'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = 'apikey'  # Esta palavra é literal, não mude
+    EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
