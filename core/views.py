@@ -13,7 +13,7 @@ from django.core import management
 from .permissions import IsAdminUserOrReadOnly
 
 # --- IMPORTS CORRIGIDOS ---
-from .models import Servico, Barbeiro, Usuario, Agendamento
+from .models import Servico, Barbeiro, Usuario, Agendamento, BloqueioDeAgenda
 from .serializers import (
     ServicoSerializer,
     BarbeiroSerializer,
@@ -32,34 +32,39 @@ class ServicoViewSet(viewsets.ModelViewSet):
 
 # Colar no lugar da antiga BarbeiroViewSet em core/views.py
 
+# Cole esta versão completa da classe BarbeiroViewSet no seu views.py
+
 class BarbeiroViewSet(viewsets.ModelViewSet):
     queryset = Barbeiro.objects.all()
     serializer_class = BarbeiroSerializer
     permission_classes = [IsAdminUserOrReadOnly]
 
-    # --- MÉTODOS AUXILIARES (Nossos "Ajudantes") ---
-    # O _ no início do nome indica que são métodos para uso interno da classe.
+    # --- MÉTODOS AUXILIARES ATUALIZADOS ---
 
     def _is_horario_no_almoco(self, slot_inicio, slot_fim, barbeiro):
         """Verifica se um slot de horário conflita com o almoço do barbeiro."""
         almoco_inicio = barbeiro.horario_inicio_almoco
         almoco_fim = barbeiro.horario_fim_almoco
-        # Retorna True se houver qualquer sobreposição com o horário de almoço
         return slot_inicio.time() < almoco_fim and slot_fim.time() > almoco_inicio
 
     def _is_horario_em_conflito(self, slot_inicio, slot_fim, agendamentos_do_dia):
         """Verifica se um slot de horário conflita com agendamentos existentes."""
         for agendamento in agendamentos_do_dia:
             agendamento_inicio = agendamento.data_agendamento
-            # Calcula o fim do agendamento existente
             duracao = timedelta(minutes=agendamento.servico.duracao_em_minutos)
             agendamento_fim = agendamento_inicio + duracao
-            # Retorna True se houver qualquer sobreposição
             if slot_inicio < agendamento_fim and slot_fim > agendamento_inicio:
                 return True
         return False
 
-    # --- MÉTODO PRINCIPAL REATORADO ---
+    def _is_horario_em_bloqueio(self, slot_inicio, slot_fim, bloqueios_do_dia):
+        """Verifica se um slot de horário conflita com um período de bloqueio."""
+        for bloqueio in bloqueios_do_dia:
+            if slot_inicio.time() < bloqueio.hora_fim and slot_fim.time() > bloqueio.hora_inicio:
+                return True
+        return False
+
+    # --- MÉTODO PRINCIPAL COM A LÓGICA FINAL ---
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
         data_str = request.query_params.get('data')
@@ -79,10 +84,12 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
         horarios_disponiveis = []
         intervalo_minimo = timedelta(minutes=15)
 
+        # Buscamos os agendamentos e os bloqueios UMA VEZ no início para otimizar
         agendamentos_do_dia = Agendamento.objects.filter(
-            barbeiro=barbeiro,
-            data_agendamento__date=data
+            barbeiro=barbeiro, data_agendamento__date=data
         ).order_by('data_agendamento')
+
+        bloqueios_do_dia = BloqueioDeAgenda.objects.filter(barbeiro=barbeiro, data=data)
 
         slot_atual = timezone.make_aware(datetime.combine(data, barbeiro.horario_inicio_trabalho))
         horario_fim_trabalho = barbeiro.horario_fim_trabalho
@@ -92,16 +99,15 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
             if slot_fim.time() > horario_fim_trabalho:
                 break
 
-            # --- LÓGICA SIMPLIFICADA USANDO OS MÉTODOS AUXILIARES ---
-            # Agora a condição é muito mais fácil de ler e entender
+            # --- CONDIÇÃO IF FINAL COM TODAS AS VERIFICAÇÕES ---
             if not self._is_horario_no_almoco(slot_atual, slot_fim, barbeiro) and \
-                    not self._is_horario_em_conflito(slot_atual, slot_fim, agendamentos_do_dia):
+                    not self._is_horario_em_conflito(slot_atual, slot_fim, agendamentos_do_dia) and \
+                    not self._is_horario_em_bloqueio(slot_atual, slot_fim, bloqueios_do_dia):
                 horarios_disponiveis.append(slot_atual.strftime('%H:%M'))
 
             slot_atual += intervalo_minimo
 
         return Response(horarios_disponiveis)
-
 class UsuarioViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer

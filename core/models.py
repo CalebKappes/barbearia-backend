@@ -44,51 +44,88 @@ class Barbeiro(models.Model):
 
 # core/models.py
 
+# Cole esta versão completa da classe Agendamento no seu models.py
+
+# Cole esta versão completa da classe Agendamento no seu models.py
+
 class Agendamento(models.Model):
-    # --- Seus campos existentes (sem alteração) ---
     cliente = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="agendamentos")
     data_agendamento = models.DateTimeField()
     confirmado = models.BooleanField(default=False)
     servico = models.ForeignKey(Servico, on_delete=models.SET_NULL, null=True, blank=True)
     barbeiro = models.ForeignKey(Barbeiro, on_delete=models.SET_NULL, null=True, blank=True)
 
-    # --- Nosso método de validação (sem alteração) ---
     def clean(self):
         super().clean()
         if not self.barbeiro or not self.servico or not self.data_agendamento:
             return
 
-        horario_agendamento = self.data_agendamento.time()
-
-        if not (self.barbeiro.horario_inicio_trabalho <= horario_agendamento < self.barbeiro.horario_fim_trabalho):
-            raise ValidationError({'data_agendamento': "O horário solicitado está fora do expediente do barbeiro."})
-
-        if (self.barbeiro.horario_inicio_almoco <= horario_agendamento < self.barbeiro.horario_fim_almoco):
-            raise ValidationError({'data_agendamento': "O horário solicitado está no período de almoço do barbeiro."})
-
+        # Calcula o início e o fim do horário do agendamento proposto
+        inicio_agendamento = self.data_agendamento
         duracao_servico = timedelta(minutes=self.servico.duracao_em_minutos)
-        fim_agendamento = self.data_agendamento + duracao_servico
+        fim_agendamento = inicio_agendamento + duracao_servico
 
+        # --- LÓGICA DE VALIDAÇÃO ATUALIZADA ---
+
+        # 1. Validação do horário de trabalho
+        if not (self.barbeiro.horario_inicio_trabalho <= inicio_agendamento.time() and
+                fim_agendamento.time() <= self.barbeiro.horario_fim_trabalho):
+            raise ValidationError(
+                {'data_agendamento': "O horário do serviço (início e fim) está fora do expediente do barbeiro."})
+
+        # 2. Validação do horário de almoço
+        almoco_inicio = self.barbeiro.horario_inicio_almoco
+        almoco_fim = self.barbeiro.horario_fim_almoco
+        if (inicio_agendamento.time() < almoco_fim and fim_agendamento.time() > almoco_inicio):
+            raise ValidationError({'data_agendamento': "O horário solicitado conflita com o período de almoço."})
+
+        # 3. Validação de BLOQUEIOS DE AGENDA (a nova lógica)
+        bloqueios_do_dia = BloqueioDeAgenda.objects.filter(
+            barbeiro=self.barbeiro,
+            data=inicio_agendamento.date()
+        )
+        for bloqueio in bloqueios_do_dia:
+            if (inicio_agendamento.time() < bloqueio.hora_fim and fim_agendamento.time() > bloqueio.hora_inicio):
+                raise ValidationError(
+                    {'data_agendamento': "O horário solicitado conflita com um período de bloqueio na agenda."})
+
+        # 4. Validação de conflito com outros AGENDAMENTOS
         agendamentos_conflitantes = Agendamento.objects.filter(
             barbeiro=self.barbeiro,
-            data_agendamento__date=self.data_agendamento.date()
+            data_agendamento__date=inicio_agendamento.date()
         ).exclude(pk=self.pk)
 
         for agendamento_existente in agendamentos_conflitantes:
             inicio_existente = agendamento_existente.data_agendamento
             fim_existente = inicio_existente + timedelta(minutes=agendamento_existente.servico.duracao_em_minutos)
 
-            if self.data_agendamento < fim_existente and fim_agendamento > inicio_existente:
+            if inicio_agendamento < fim_existente and fim_agendamento > inicio_existente:
                 raise ValidationError(f"Conflito de horário. Já existe um agendamento neste período.")
 
-    # --- O MÉTODO QUE FALTAVA ---
-    # Adicionamos este método para forçar a validação a rodar sempre
     def save(self, *args, **kwargs):
-        self.full_clean()  # Chama o método .clean() e todas as outras validações do modelo
-        super().save(*args, **kwargs)  # Se tudo estiver ok, salva o objeto
+        self.full_clean()
+        super().save(*args, **kwargs)
 
-    # --- Método __str__ (sem alteração) ---
     def __str__(self):
         cliente_nome = self.cliente.get_full_name() or self.cliente.username
         servico_nome = self.servico.nome if self.servico else "Serviço não definido"
         return f"{servico_nome} para {cliente_nome} em {self.data_agendamento.strftime('%d/%m/%Y às %H:%M')}"
+
+# Adicionar esta nova classe no models.py (e apagar a classe DiaDeFolga)
+
+class BloqueioDeAgenda(models.Model):
+    """
+    Modelo para registrar períodos de ausência (folgas, reuniões, etc.)
+    em que um barbeiro não estará disponível.
+    """
+    barbeiro = models.ForeignKey(Barbeiro, on_delete=models.CASCADE, related_name="bloqueios")
+    data = models.DateField(help_text="O dia do bloqueio.")
+    hora_inicio = models.TimeField(help_text="Horário de início do bloqueio.")
+    hora_fim = models.TimeField(help_text="Horário de fim do bloqueio.")
+    motivo = models.CharField(max_length=200, blank=True, null=True, help_text="Motivo da ausência (opcional).")
+
+    class Meta:
+        ordering = ['data', 'hora_inicio'] # Ordena os bloqueios por data e hora
+
+    def __str__(self):
+        return f"Bloqueio de {self.barbeiro.nome} em {self.data.strftime('%d/%m/%Y')} das {self.hora_inicio.strftime('%H:%M')} às {self.hora_fim.strftime('%H:%M')}"
