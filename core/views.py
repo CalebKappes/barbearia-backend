@@ -30,13 +30,36 @@ class ServicoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUserOrReadOnly]
 
 
+# Colar no lugar da antiga BarbeiroViewSet em core/views.py
+
 class BarbeiroViewSet(viewsets.ModelViewSet):
     queryset = Barbeiro.objects.all()
     serializer_class = BarbeiroSerializer
     permission_classes = [IsAdminUserOrReadOnly]
 
-    # Este método vai dentro da classe BarbeiroViewSet
+    # --- MÉTODOS AUXILIARES (Nossos "Ajudantes") ---
+    # O _ no início do nome indica que são métodos para uso interno da classe.
 
+    def _is_horario_no_almoco(self, slot_inicio, slot_fim, barbeiro):
+        """Verifica se um slot de horário conflita com o almoço do barbeiro."""
+        almoco_inicio = barbeiro.horario_inicio_almoco
+        almoco_fim = barbeiro.horario_fim_almoco
+        # Retorna True se houver qualquer sobreposição com o horário de almoço
+        return slot_inicio.time() < almoco_fim and slot_fim.time() > almoco_inicio
+
+    def _is_horario_em_conflito(self, slot_inicio, slot_fim, agendamentos_do_dia):
+        """Verifica se um slot de horário conflita com agendamentos existentes."""
+        for agendamento in agendamentos_do_dia:
+            agendamento_inicio = agendamento.data_agendamento
+            # Calcula o fim do agendamento existente
+            duracao = timedelta(minutes=agendamento.servico.duracao_em_minutos)
+            agendamento_fim = agendamento_inicio + duracao
+            # Retorna True se houver qualquer sobreposição
+            if slot_inicio < agendamento_fim and slot_fim > agendamento_inicio:
+                return True
+        return False
+
+    # --- MÉTODO PRINCIPAL REATORADO ---
     @action(detail=True, methods=['get'])
     def horarios_disponiveis(self, request, pk=None):
         data_str = request.query_params.get('data')
@@ -53,48 +76,31 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
         barbeiro = self.get_object()
         duracao_servico = timedelta(minutes=servico.duracao_em_minutos)
 
-        # --- LÓGICA REATORADA ---
-        # Buscando os horários diretamente do objeto 'barbeiro' do banco de dados!
-        # Não usamos mais valores fixos como time(9, 0).
-        horario_inicio_trabalho = barbeiro.horario_inicio_trabalho
-        horario_fim_trabalho = barbeiro.horario_fim_trabalho
-        horario_inicio_almoco = barbeiro.horario_inicio_almoco
-        horario_fim_almoco = barbeiro.horario_fim_almoco
-        # -------------------------
-
-        intervalo_minimo = timedelta(minutes=15)
         horarios_disponiveis = []
+        intervalo_minimo = timedelta(minutes=15)
 
         agendamentos_do_dia = Agendamento.objects.filter(
             barbeiro=barbeiro,
             data_agendamento__date=data
         ).order_by('data_agendamento')
 
-        slot_atual = timezone.make_aware(datetime.combine(data, horario_inicio_trabalho))
+        slot_atual = timezone.make_aware(datetime.combine(data, barbeiro.horario_inicio_trabalho))
+        horario_fim_trabalho = barbeiro.horario_fim_trabalho
 
         while slot_atual.time() < horario_fim_trabalho:
             slot_fim = slot_atual + duracao_servico
             if slot_fim.time() > horario_fim_trabalho:
                 break
 
-            slot_nao_conflita_almoco = not (
-                (slot_atual.time() < horario_fim_almoco and slot_fim.time() > horario_inicio_almoco)
-            )
-            slot_livre = True
-            for agendamento in agendamentos_do_dia:
-                agendamento_inicio = agendamento.data_agendamento
-                agendamento_fim = agendamento_inicio + timedelta(minutes=agendamento.servico.duracao_em_minutos)
-                if slot_atual < agendamento_fim and slot_fim > agendamento_inicio:
-                    slot_livre = False
-                    break
-
-            if slot_nao_conflita_almoco and slot_livre:
+            # --- LÓGICA SIMPLIFICADA USANDO OS MÉTODOS AUXILIARES ---
+            # Agora a condição é muito mais fácil de ler e entender
+            if not self._is_horario_no_almoco(slot_atual, slot_fim, barbeiro) and \
+                    not self._is_horario_em_conflito(slot_atual, slot_fim, agendamentos_do_dia):
                 horarios_disponiveis.append(slot_atual.strftime('%H:%M'))
 
             slot_atual += intervalo_minimo
 
         return Response(horarios_disponiveis)
-
 
 class UsuarioViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Usuario.objects.all()
