@@ -4,34 +4,27 @@ import os
 import dj_database_url
 from pathlib import Path
 from decouple import config
-import dj_database_url
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Carrega variáveis de ambiente de um arquivo .env em desenvolvimento
 from dotenv import load_dotenv
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv() # O dotenv vai procurar o .env no diretório raiz automaticamente
 
-# SECRET_KEY agora vem de uma variável de ambienteF
+# --- Configurações Principais ---
+BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
+DEBUG = config("DEBUG", default=False, cast=bool)
+ROOT_URLCONF = 'barbearia_project.urls'
+WSGI_APPLICATION = 'barbearia_project.wsgi.application'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+AUTH_USER_MODEL = 'core.Usuario' # Modelo de usuário customizado
 
-# DEBUG agora vem de uma variável de ambiente
-# O 'False' é o padrão se a variável não for encontrada (mais seguro)
-DEBUG = os.getenv("DEBUG", "False").lower() in ["true", "1", "t"]
-
+# --- Hosts Permitidos ---
 ALLOWED_HOSTS = []
-
-# Adicionaremos nossa URL de produção aqui depois
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
-# Application definition
-# ... (o resto de INSTALLED_APPS fica como está) ...
-
-
-# Application definition
-
+# --- Aplicativos Instalados ---
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -39,14 +32,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Apps de terceiros
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    # Seu app
     'core',
 ]
 
+# --- Middleware ---
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # Deve vir antes da maioria dos outros
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -57,8 +53,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'barbearia_project.urls'
-
+# --- Templates ---
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -74,88 +69,52 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'barbearia_project.wsgi.application'
-
-
-# barbearia_project/settings.py
-
+# --- Banco de Dados ---
 DATABASES = {
     'default': dj_database_url.parse(config('DATABASE_URL'))
 }
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
+# --- Validadores de Senha ---
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+# --- Internacionalização ---
+LANGUAGE_CODE = 'pt-br'
+TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
+# --- Arquivos Estáticos (CSS, JS, Imagens) ---
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# barbearia_project/settings.py
-
-# ... (resto das suas configurações) ...
-
-# Configurações do Django REST Framework
-# Substitua o dicionário REST_FRAMEWORK antigo por este:
+# --- Configurações do Django Rest Framework (API) ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        # APENAS a autenticação por Token como padrão para a API.
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ]
 }
-# --- Configuração Final de CORS ---
 
-# Para desenvolvimento local, permita o acesso do React
+# --- Configurações de CORS (Cross-Origin Resource Sharing) ---
 if DEBUG:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
-# Para produção, use a variável de ambiente
 else:
     CORS_ALLOWED_ORIGINS_STR = os.getenv('CORS_ALLOWED_ORIGINS', '')
     CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_STR.split(',') if CORS_ALLOWED_ORIGINS_STR else []
 
-
-# Permite que o navegador envie cookies/credenciais (importante para o futuro).
 CORS_ALLOW_CREDENTIALS = True
-
-# Permite cabeçalhos específicos necessários para a nossa API.
 CORS_ALLOW_HEADERS = [
     "accept",
     "authorization",
@@ -164,51 +123,24 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
-# Adicione estas linhas para produção com o WhiteNoise
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-# ... (o resto das configurações como CORS_... e REST_FRAMEWORK...)
+# --- Configurações de Cookies (para produção) ---
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_SECURE = True
 
-# settings.py
-# ... no final do arquivo ...
-
-# Configurações de E-mail com SendGrid
-EMAIL_BACKEND = "sendgrid_backend.SendgridBackend"
-# A sua chave de API será lida de uma variável de ambiente
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-# E-mail que aparecerá como remetente
-SENDGRID_FROM_EMAIL = "sherlockbarberapp@gmail.com"
-# settings.py (no final do arquivo)
-CRON_SECRET_KEY = os.getenv("CRON_SECRET_KEY")
-# settings.py
-
-# ... todo o resto do seu arquivo ...
-
-# Designa nosso modelo customizado como o padrão para autenticação
-AUTH_USER_MODEL = 'core.Usuario'
-# settings.py
-
-# ... (outras configurações) ...
-
-# --- CONFIGURAÇÕES DE E-MAIL (SENDGRID) ---
-# Lendo as variáveis do nosso arquivo .env
+# --- Configurações de E-mail (SendGrid) ---
 SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
-SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='')
+SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='seu-email-aqui@exemplo.com')
 
-# Configuração do serviço de e-mail do Django
 if SENDGRID_API_KEY:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = 'smtp.sendgrid.net'
     EMAIL_PORT = 587
     EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = 'apikey'  # Esta palavra é literal, não mude
+    EMAIL_HOST_USER = 'apikey'
     EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+
+# --- Chave Secreta para CRON Jobs ---
+CRON_SECRET_KEY = config("CRON_SECRET_KEY", default='')

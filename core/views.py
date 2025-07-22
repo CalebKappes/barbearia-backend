@@ -6,11 +6,11 @@ from django.utils import timezone
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
+# A permissão 'IsAdminUserOrReadOnly' foi removida dos imports pois não é mais utilizada
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from datetime import datetime, time, timedelta
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.core import management
-from .permissions import IsAdminUserOrReadOnly
 
 # --- IMPORTS CORRIGIDOS ---
 from .models import Servico, Barbeiro, Usuario, Agendamento, BloqueioDeAgenda
@@ -27,17 +27,15 @@ from .serializers import (
 class ServicoViewSet(viewsets.ModelViewSet):
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
-    permission_classes = [IsAdminUserOrReadOnly]
+    # CORREÇÃO: Permissão alterada para permitir que qualquer usuário logado veja os serviços.
+    permission_classes = [IsAuthenticated]
 
-
-# Colar no lugar da antiga BarbeiroViewSet em core/views.py
-
-# Cole esta versão completa da classe BarbeiroViewSet no seu views.py
 
 class BarbeiroViewSet(viewsets.ModelViewSet):
     queryset = Barbeiro.objects.all()
     serializer_class = BarbeiroSerializer
-    permission_classes = [IsAdminUserOrReadOnly]
+    # CORREÇÃO: Permissão alterada para permitir que qualquer usuário logado veja os barbeiros.
+    permission_classes = [IsAuthenticated]
 
     # --- MÉTODOS AUXILIARES ATUALIZADOS ---
 
@@ -84,7 +82,6 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
         horarios_disponiveis = []
         intervalo_minimo = timedelta(minutes=15)
 
-        # Buscamos os agendamentos e os bloqueios UMA VEZ no início para otimizar
         agendamentos_do_dia = Agendamento.objects.filter(
             barbeiro=barbeiro, data_agendamento__date=data
         ).order_by('data_agendamento')
@@ -99,7 +96,6 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
             if slot_fim.time() > horario_fim_trabalho:
                 break
 
-            # --- CONDIÇÃO IF FINAL COM TODAS AS VERIFICAÇÕES ---
             if not self._is_horario_no_almoco(slot_atual, slot_fim, barbeiro) and \
                     not self._is_horario_em_conflito(slot_atual, slot_fim, agendamentos_do_dia) and \
                     not self._is_horario_em_bloqueio(slot_atual, slot_fim, bloqueios_do_dia):
@@ -108,6 +104,7 @@ class BarbeiroViewSet(viewsets.ModelViewSet):
             slot_atual += intervalo_minimo
 
         return Response(horarios_disponiveis)
+
 class UsuarioViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
