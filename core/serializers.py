@@ -2,8 +2,8 @@
 
 from rest_framework import serializers
 from datetime import timedelta
-# Importando os modelos com os nomes corretos do nosso novo models.py
-from .models import Servico, Barbeiro, Usuario, Agendamento
+# CORREÇÃO: Importamos o módulo 'models' inteiro para evitar importações circulares.
+from . import models
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -14,43 +14,44 @@ class UsuarioSerializer(serializers.ModelSerializer):
     Serializer para o nosso modelo de usuário customizado.
     """
     class Meta:
-        model = Usuario
-        # Vamos expor apenas os campos seguros e úteis
+        # Apontamos para o modelo através do módulo.
+        model = models.Usuario
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
 
 class ServicoSerializer(serializers.ModelSerializer):
     """
-    Serializer para o modelo Servico. Este já estava correto.
+    Serializer para o modelo Servico.
     """
     class Meta:
-        model = Servico
+        model = models.Servico
         fields = '__all__'
 
 
 class BarbeiroSerializer(serializers.ModelSerializer):
     """
-    CORRIGIDO: Renomeamos de ProfissionalSerializer para BarbeiroSerializer
-    e apontamos para o modelo correto 'Barbeiro'.
+    Serializer para o modelo Barbeiro.
     """
     class Meta:
-        model = Barbeiro
+        model = models.Barbeiro
         fields = '__all__'
 
 
 class AgendamentoSerializer(serializers.ModelSerializer):
+    # As relações aninhadas já usam as classes de serializer definidas acima, o que está correto.
     servico = ServicoSerializer(read_only=True)
     barbeiro = BarbeiroSerializer(read_only=True)
 
+    # Os querysets para os campos de escrita também precisam usar o novo padrão de importação.
     servico_id = serializers.PrimaryKeyRelatedField(
-        queryset=Servico.objects.all(), source='servico', write_only=True, label="Serviço"
+        queryset=models.Servico.objects.all(), source='servico', write_only=True, label="Serviço"
     )
     barbeiro_id = serializers.PrimaryKeyRelatedField(
-        queryset=Barbeiro.objects.all(), source='barbeiro', write_only=True, label="Barbeiro"
+        queryset=models.Barbeiro.objects.all(), source='barbeiro', write_only=True, label="Barbeiro"
     )
 
     class Meta:
-        model = Agendamento
+        model = models.Agendamento
         fields = [
             'id', 'cliente', 'data_agendamento', 'confirmado',
             'servico', 'barbeiro', 'servico_id', 'barbeiro_id'
@@ -60,13 +61,12 @@ class AgendamentoSerializer(serializers.ModelSerializer):
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """
-    TOTALMENTE REFEITO: Agora este serializer trabalha com o nosso
-    modelo 'Usuario' customizado e não mais com o 'Cliente' separado.
+    Serializer para o registo de novos usuários.
     """
     password2 = serializers.CharField(style={'input_type': 'password'}, write_only=True)
 
     class Meta:
-        model = Usuario
+        model = models.Usuario
         fields = ['username', 'email', 'password', 'password2', 'first_name', 'last_name']
         extra_kwargs = {
             'password': {'write_only': True}
@@ -82,14 +82,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Remove o campo 'password2' que não faz parte do modelo Usuario
         validated_data.pop('password2')
         # Cria o usuário usando o método create_user que já encripta a senha
-        user = Usuario.objects.create_user(**validated_data)
+        user = models.Usuario.objects.create_user(**validated_data)
         return user
 
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
-    Este já estava correto. Apenas garantimos que ele funciona
-    com nosso modelo de usuário.
+    Serializer para obter o token de autenticação.
     """
     @classmethod
     def get_token(cls, user):
