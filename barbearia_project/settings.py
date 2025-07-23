@@ -20,9 +20,16 @@ AUTH_USER_MODEL = 'core.Usuario' # Modelo de usuário customizado
 
 # --- Hosts Permitidos ---
 ALLOWED_HOSTS = []
+
+# Adiciona o URL do Render dinamicamente
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Adiciona o URL do Vercel para permitir a comunicação
+VERCEL_URL = os.environ.get('VERCEL_URL')
+if VERCEL_URL:
+    ALLOWED_HOSTS.append(VERCEL_URL)
 
 # --- Aplicativos Instalados ---
 INSTALLED_APPS = [
