@@ -7,8 +7,16 @@ from pathlib import Path
 # --- Configurações Principais ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Lendo as variáveis diretamente do ambiente, o que é mais robusto para produção.
+# Lendo as variáveis diretamente do ambiente.
+# Se uma variável essencial não for encontrada, o programa irá falhar com uma mensagem clara.
 SECRET_KEY = os.environ.get('SECRET_KEY')
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if not SECRET_KEY:
+    raise ValueError("A variável de ambiente SECRET_KEY não foi definida.")
+if not DATABASE_URL:
+    raise ValueError("A variável de ambiente DATABASE_URL não foi definida.")
+
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 't']
 
 ROOT_URLCONF = 'barbearia_project.urls'
@@ -65,8 +73,6 @@ TEMPLATES = [
 ]
 
 # --- Banco de Dados ---
-# CORREÇÃO FINAL: A variável DATABASE_URL é definida aqui, antes de ser usada.
-DATABASE_URL = os.environ.get('DATABASE_URL')
 DATABASES = {
     'default': dj_database_url.parse(DATABASE_URL)
 }
