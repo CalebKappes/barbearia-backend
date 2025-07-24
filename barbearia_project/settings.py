@@ -3,16 +3,14 @@
 import os
 import dj_database_url
 from pathlib import Path
-from decouple import config
-
-# Carrega variáveis de ambiente de um arquivo .env
-from dotenv import load_dotenv
-load_dotenv()
 
 # --- Configurações Principais ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config("DEBUG", default=False, cast=bool)
+
+# CORREÇÃO FINAL: Lendo as variáveis diretamente do ambiente, o que é mais robusto para produção.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 't']
+
 ROOT_URLCONF = 'barbearia_project.urls'
 WSGI_APPLICATION = 'barbearia_project.wsgi.application'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -67,8 +65,10 @@ TEMPLATES = [
 ]
 
 # --- Banco de Dados ---
+# Usamos um valor padrão para a DATABASE_URL para evitar erros se a variável não estiver definida.
+DATABASE_URL = os.environ.get('DATABASE_URL')
 DATABASES = {
-    'default': dj_database_url.parse(config('DATABASE_URL'))
+    'default': dj_database_url.parse(DATABASE_URL)
 }
 
 # --- Validadores de Senha ---
@@ -101,26 +101,24 @@ REST_FRAMEWORK = {
 }
 
 # --- Configurações de CORS ---
-# CORREÇÃO FINAL: A lista é criada aqui, fora de qualquer condição.
 CORS_ALLOWED_ORIGINS = []
 
 if DEBUG:
-    # Em desenvolvimento, adicionamos o localhost.
     CORS_ALLOWED_ORIGINS.extend([
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ])
 else:
     # Em produção, adicionamos o URL da Vercel.
-    VERCEL_URL = os.getenv('VERCEL_URL', 'https://barbearia-frontend-snowy.vercel.app')
+    VERCEL_URL = os.environ.get('VERCEL_URL', 'https://barbearia-frontend-snowy.vercel.app')
     if VERCEL_URL:
         CORS_ALLOWED_ORIGINS.append(VERCEL_URL)
 
 CORS_ALLOW_CREDENTIALS = True
 
 # --- Configurações de E-mail (SendGrid) ---
-SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
-SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='')
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL')
 
 if SENDGRID_API_KEY:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -131,4 +129,4 @@ if SENDGRID_API_KEY:
     EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
 
 # --- Chave Secreta para CRON Jobs ---
-CRON_SECRET_KEY = config("CRON_SECRET_KEY", default='')
+CRON_SECRET_KEY = os.environ.get("CRON_SECRET_KEY")
