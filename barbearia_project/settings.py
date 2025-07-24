@@ -45,9 +45,6 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # CORREÇÃO FINAL: Comentamos esta linha. A proteção CSRF não é necessária
-    # para uma API JWT e estava a causar o "crash silencioso".
-    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -104,14 +101,20 @@ REST_FRAMEWORK = {
 }
 
 # --- Configurações de CORS ---
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-# Adiciona o URL da Vercel à lista de origens permitidas em produção
-VERCEL_URL = os.getenv('VERCEL_URL', 'https://barbearia-frontend-snowy.vercel.app')
-if VERCEL_URL:
-    CORS_ALLOWED_ORIGINS.append(VERCEL_URL)
+# CORREÇÃO FINAL: A lista é criada aqui, fora de qualquer condição.
+CORS_ALLOWED_ORIGINS = []
+
+if DEBUG:
+    # Em desenvolvimento, adicionamos o localhost.
+    CORS_ALLOWED_ORIGINS.extend([
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ])
+else:
+    # Em produção, adicionamos o URL da Vercel.
+    VERCEL_URL = os.getenv('VERCEL_URL', 'https://barbearia-frontend-snowy.vercel.app')
+    if VERCEL_URL:
+        CORS_ALLOWED_ORIGINS.append(VERCEL_URL)
 
 CORS_ALLOW_CREDENTIALS = True
 
