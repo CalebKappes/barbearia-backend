@@ -5,9 +5,9 @@ import dj_database_url
 from pathlib import Path
 from decouple import config
 
-# Carrega variáveis de ambiente de um arquivo .env em desenvolvimento
+# Carrega variáveis de ambiente de um arquivo .env
 from dotenv import load_dotenv
-load_dotenv() # O dotenv vai procurar o .env no diretório raiz automaticamente
+load_dotenv()
 
 # --- Configurações Principais ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -16,20 +16,13 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 ROOT_URLCONF = 'barbearia_project.urls'
 WSGI_APPLICATION = 'barbearia_project.wsgi.application'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-AUTH_USER_MODEL = 'core.Usuario' # Modelo de usuário customizado
+AUTH_USER_MODEL = 'core.Usuario'
 
 # --- Hosts Permitidos ---
 ALLOWED_HOSTS = []
-
-# Adiciona o URL do Render dinamicamente
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-
-# Adiciona o URL do Vercel para permitir a comunicação
-VERCEL_URL = os.environ.get('VERCEL_URL')
-if VERCEL_URL:
-    ALLOWED_HOSTS.append(VERCEL_URL)
 
 # --- Aplicativos Instalados ---
 INSTALLED_APPS = [
@@ -39,22 +32,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Apps de terceiros
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    # Seu app
     'core',
 ]
 
 # --- Middleware ---
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Deve vir antes da maioria dos outros
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # CORREÇÃO FINAL: Comentamos esta linha. A proteção CSRF não é necessária
+    # para uma API JWT e estava a causar o "crash silencioso".
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -95,15 +88,14 @@ TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# --- Arquivos Estáticos (CSS, JS, Imagens) ---
+# --- Arquivos Estáticos ---
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# --- Configurações do Django Rest Framework (API) ---
+# --- Configurações da API ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # APENAS a autenticação por Token como padrão para a API.
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -111,35 +103,21 @@ REST_FRAMEWORK = {
     ]
 }
 
-# --- Configurações de CORS (Cross-Origin Resource Sharing) ---
-if DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
-else:
-    CORS_ALLOWED_ORIGINS_STR = os.getenv('CORS_ALLOWED_ORIGINS', '')
-    CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_STR.split(',') if CORS_ALLOWED_ORIGINS_STR else []
+# --- Configurações de CORS ---
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+# Adiciona o URL da Vercel à lista de origens permitidas em produção
+VERCEL_URL = os.getenv('VERCEL_URL', 'https://barbearia-frontend-snowy.vercel.app')
+if VERCEL_URL:
+    CORS_ALLOWED_ORIGINS.append(VERCEL_URL)
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "authorization",
-    "content-type",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
-
-# --- Configurações de Cookies (para produção) ---
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = True
 
 # --- Configurações de E-mail (SendGrid) ---
 SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
-SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='seu-email-aqui@exemplo.com')
+SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='')
 
 if SENDGRID_API_KEY:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
