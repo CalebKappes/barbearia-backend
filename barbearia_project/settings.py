@@ -7,7 +7,7 @@ from pathlib import Path
 # --- Configurações Principais ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# CORREÇÃO FINAL: Lendo as variáveis diretamente do ambiente, o que é mais robusto para produção.
+# Lendo as variáveis diretamente do ambiente, o que é mais robusto para produção.
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 't']
 
@@ -65,7 +65,7 @@ TEMPLATES = [
 ]
 
 # --- Banco de Dados ---
-# Usamos um valor padrão para a DATABASE_URL para evitar erros se a variável não estiver definida.
+# CORREÇÃO FINAL: A variável DATABASE_URL é definida aqui, antes de ser usada.
 DATABASE_URL = os.environ.get('DATABASE_URL')
 DATABASES = {
     'default': dj_database_url.parse(DATABASE_URL)
